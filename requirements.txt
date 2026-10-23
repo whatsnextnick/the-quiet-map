@@ -1,0 +1,8 @@
+pandas>=2.0
+geopandas>=1.0
+requests>=2.31
+folium>=0.15
+streamlit>=1.30
+matplotlib>=3.8
+jupyter>=1.0
+pydeck>=0.8
