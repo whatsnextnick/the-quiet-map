@@ -51,6 +51,10 @@ def apportion(tracts: gpd.GeoDataFrame, zone) -> gpd.GeoDataFrame:
     return hits
 
 
+def _rate(num: float, den: float):
+    return round(num / den, 4) if den else None
+
+
 def summarize(iata: str, zone, tracts: gpd.GeoDataFrame):
     hits = apportion(tracts, zone)
     if hits.empty:
@@ -60,31 +64,39 @@ def summarize(iata: str, zone, tracts: gpd.GeoDataFrame):
 
     exposed_pop = float((pop * w).sum())
     ref_pop = float(pop.sum())
+    if ref_pop == 0:
+        # zone touches only unpopulated land (airport/water "9800" tracts)
+        return None, []
+    outside_pop = ref_pop - exposed_pop
     summary = {
         "airport": iata,
         "zone_area_km2": round(zone.area / 1e6, 1),
         "n_tracts_touching": len(hits),
         "exposed_pop": round(exposed_pop),
-        "exposed_share_of_reference": round(exposed_pop / ref_pop, 4),
+        "exposed_share_of_reference": _rate(exposed_pop, ref_pop),
     }
 
     # poverty + age inside vs. the rest of the touching tracts
     pov = hits["poverty_count"].fillna(0)
     exposed_pov = float((pov * w).sum())
-    summary["poverty_rate_inside"] = round(exposed_pov / exposed_pop, 4)
-    summary["poverty_rate_outside"] = round(
-        (float(pov.sum()) - exposed_pov) / (ref_pop - exposed_pop), 4)
+    summary["poverty_rate_inside"] = _rate(exposed_pov, exposed_pop)
+    summary["poverty_rate_outside"] = _rate(
+        float(pov.sum()) - exposed_pov, outside_pop)
     age = hits["median_age"]
-    summary["median_age_inside"] = round(
-        float((age * pop * w).sum()) / exposed_pop, 1)
-    summary["median_age_outside"] = round(
-        float((age * pop * (1 - w)).sum()) / (ref_pop - exposed_pop), 1)
+    if exposed_pop:
+        summary["median_age_inside"] = round(
+            float((age * pop * w).sum()) / exposed_pop, 1)
+    else:
+        summary["median_age_inside"] = None
+    summary["median_age_outside"] = (round(
+        float((age * pop * (1 - w)).sum()) / outside_pop, 1)
+        if outside_pop else None)
 
     group_rows = []
     for col, label in GROUPS.items():
         g = hits[col].fillna(0)
         exposed_g = float((g * w).sum())
-        share_exposed = exposed_g / exposed_pop
+        share_exposed = exposed_g / exposed_pop if exposed_pop else 0.0
         share_ref = float(g.sum()) / ref_pop
         group_rows.append({
             "airport": iata,
@@ -116,7 +128,7 @@ def main() -> None:
     for _, c in contours.iterrows():
         s, g = summarize(c["airport"], c.geometry, tracts)
         if s is None:
-            print(f"{c['airport']}: no tracts touch the zone")
+            print(f"{c['airport']}: no populated tracts touch the zone")
             continue
         summaries.append(s)
         all_groups.extend(g)
@@ -140,6 +152,25 @@ def main() -> None:
                                         index=False)
         print(f"\nwrote exposure_summary.csv, exposure_by_group.csv "
               f"({len(summaries)} airport(s))")
+
+    if len(contours) > 1:
+        # National rollup: union ALL zones first so tracts under two
+        # airports' zones are counted once, then apportion once.
+        nat_s, nat_g = summarize("NATIONAL", contours.union_all(), tracts)
+        print(f"\n== NATIONAL (union of {len(contours)} zones; each tract "
+              f"counted once) ==")
+        print(f"{nat_s['exposed_pop']:,.0f} people inside the union of all "
+              f"zones ({nat_s['zone_area_km2']} km^2)")
+        print(f"  poverty rate inside {nat_s['poverty_rate_inside']:.1%} vs "
+              f"outside {nat_s['poverty_rate_outside']:.1%} | "
+              f"median age {nat_s['median_age_inside']} vs "
+              f"{nat_s['median_age_outside']}")
+        for row in nat_g:
+            print(f"  {row['group']:<30} exposed {row['exposed']:>8,.0f}  "
+                  f"ratio {row['disparity_ratio']}")
+        pd.DataFrame([nat_s]).to_csv(PROC_DIR / "exposure_national.csv",
+                                     index=False)
+        print("wrote exposure_national.csv")
 
 
 if __name__ == "__main__":

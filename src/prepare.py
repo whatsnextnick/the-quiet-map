@@ -29,8 +29,10 @@ RAW_DIR = Path(__file__).resolve().parent.parent / "data" / "raw"
 PROC_DIR = Path(__file__).resolve().parent.parent / "data" / "processed"
 CRS = "EPSG:5070"  # Albers Equal Area (CONUS)
 
-# Census codes for suppressed estimates — treated as missing, not as numbers.
-ACS_SUPPRESSED = {"-666666666", "-999999999"}
+# Census uses large negative codes (e.g. -666666666) for suppressed
+# estimates. Real values never go below -1e8, so mask numerically -- exact
+# string replacement here silently failed when passed a set (see playbook).
+SUPPRESSED_FLOOR = -1e8
 
 # ACS 5-year variable -> friendly column name.
 ACS_COLUMNS = {
@@ -60,8 +62,8 @@ def load_acs() -> pd.DataFrame:
     acs["GEOID"] = acs["state"] + acs["county"] + acs["tract"]
     acs = acs[["GEOID", *ACS_COLUMNS]].rename(columns=ACS_COLUMNS)
     for col in ACS_COLUMNS.values():
-        acs[col] = pd.to_numeric(acs[col].replace(ACS_SUPPRESSED, None),
-                                 errors="coerce")
+        acs[col] = pd.to_numeric(acs[col], errors="coerce")
+        acs.loc[acs[col] < SUPPRESSED_FLOOR, col] = pd.NA
     return acs
 
 

@@ -206,8 +206,12 @@ which_airport_cost/
 - [x] **Phase 2 — Overlay.** Spatial join tracts × contours; sanity-check against
       a published exposure figure for one airport. ✅ Validated vs ATL's
       2024 NEM: same order of magnitude (~0.5–0.6×), see docs/validation.md.
-- [ ] **Phase 3 — Equity.** Exposed population by demographic group; disparity
-      index; national summary.
+- [x] **Phase 3 — Equity.** Exposed population by demographic group; disparity
+      index; national summary. ✅ 646 airports processed: 292,745 people
+      nationally live in DNL 65+ zones (modeled); Black residents 1.57× and
+      Native Hawaiian/Pacific Islander 1.61× as likely to be exposed; poverty
+      14.1% inside vs. 11.1% nearby. Outputs: `exposure_summary.csv`,
+      `exposure_by_group.csv`, `exposure_national.csv`.
 - [ ] **Phase 4 — The map.** Folium/Streamlit explorer: airport → contour →
       exposed community.
 - [ ] **Phase 5 — Story.** One-page brief + short public write-up.

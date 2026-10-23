@@ -459,6 +459,19 @@ computing any fairness number, or the number is unfalsifiable.
 - **File Geodatabase / mosaic dataset:** Esri's container format; a mosaic
   is its way of storing many raster tiles as one catalog. We read it with
   open-source tools (rasterio/pyogrio) — no ArcGIS needed.
+- **Batch processing:** running one operation over every item in a list,
+  unattended. Our contour extraction went from one airport to all 781 in
+  one command.
+- **Union / dissolve:** merging overlapping shapes into a single shape.
+  Used for the national rollup so residents under two airports' zones are
+  counted exactly once (avoids **double counting**).
+- **National rollup:** the all-airports summary — the headline number of
+  the project.
+- **Sentinel value:** a numeric code that means "no data here" rather than
+  a measurement — e.g., the Census's -666666666 for privacy-suppressed
+  estimates. Must be masked before any math.
+- **Zero-guard:** any division's denominator can be zero at scale; return
+  "no value" instead of crashing.
 
 ---
 
@@ -507,3 +520,56 @@ comparison is itself reproducible.
 | Site 403s for scripts but works in your browser | Bot protection on government/enterprise sites | Make it a human step; note it in the playbook, don't fight it |
 | Several similar tables (8/9 vs 14/15) | Existing-year vs forecast-year versions | Always take the *existing* year for validation |
 | Official number way off from yours, either direction | Definition mismatch (insulated split, residence vs population, vintage) | Re-read the table's source note; document the mismatch rather than forcing agreement |
+
+---
+
+## Step 12 — Scaling to the whole country (Phase 3)
+
+**What we did.** One batch command extracted DNL 65 zones for all 781
+airports in the dataset (state rasters opened once each, not once per
+airport). Result: **646 airports have a ≥65 dB zone; 135 smaller ones
+don't reach it** — recorded as a result in `contours/_batch_summary.csv`,
+not an error. Rebuilding `contours.parquet` and running `analyze.py`
+across all zones produced the national picture:
+
+- **292,745 people** live inside the union of all 646 zones (1,229 km²),
+  each tract counted once
+- Disparity ratios: Black **1.57×**, Native Hawaiian/Pacific Islander
+  **1.61×**, White 0.80×, poverty rate 14.1% inside vs. 11.1% nearby
+- Top single-airport exposures: HHR (~21k), BVY (~18k), LGB/LAX (~17k);
+  23 airports expose 10,000+ people each
+
+New terms: **batch processing** (running one operation over every item in
+a list, unattended); **union/dissolve** (merging overlapping shapes into
+one so nothing is double-counted); **national rollup** (the all-airports
+summary — the project's headline number); **sentinel value** (a numeric
+code like -666666666 that means "suppressed for privacy," not a real
+measurement — governments use these everywhere).
+
+**Two more bugs, both classic scaling bugs** (they only appear when you go
+from 1 item to 646):
+
+1. `ZeroDivisionError` on an airport whose zone touches only unpopulated
+   tracts. At national scale, "nothing here" is a *normal result*, not an
+   exception — every denominator got a guard (`_rate()` returns None when
+   the denominator is 0).
+2. A silent pandas failure: `Series.replace({a, set}, None)` matched
+   *nothing*, so Census sentinel values leaked into `tracts.parquet`. The
+   national median age came out as **-25,904 years** — impossible, which
+   is the only reason it was caught. Fix: convert to numbers, then mask
+   everything below -1e8 (real values never go there). Re-verified: 0
+   sentinel cells remain, total population unchanged, median ages in the
+   human range.
+
+**Essence.** *Scale changes failure modes, not just runtime.* Going from
+one airport to 646 means: "no result" becomes common and must be a first-
+class output; every division needs a zero-guard; and silent cleanup steps
+(like that string replace) get their reckoning. The defense is the same
+habit as always — **compute one impossible-value check per output** (ages
+within [0, 100], counts ≥ 0, parts summing to the whole). An absurd number
+is the data pipeline's fire alarm: never paper over it, always chase it.
+
+**Also note — known caveats now visible at scale:** the Los Angeles
+cluster (LAX/LGB/SMO/BUR) has mutually overlapping zones; the national
+union counts those residents once, but per-airport numbers there overlap.
+Fine for the headline; worth a footnote in any story.
