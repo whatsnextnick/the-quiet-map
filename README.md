@@ -157,9 +157,14 @@ Implement against the stubs already in `src/`, one milestone at a time:
    and writes GeoParquet to `data/processed/` (`tracts.parquet`,
    `airports.parquet`, `runways.parquet`, `contours.parquet` when contour
    files exist). Run one stage, e.g. `python src/prepare.py tracts`, or all.
-3. First milestone to aim for: **one airport, end to end** — overlay ATL's
-   contour on tracts, pull the demographics of tracts inside the DNL 65 line,
-   print the number. That proves the whole pipeline before scaling.
+3. ✅ **Done — ATL end to end.** `src/analyze.py` fractionally apportions
+   tract populations into each airport's DNL 65 zone and computes equity
+   metrics (exposed population per group, disparity ratios, poverty and
+   age inside vs. outside). ATL's first real numbers: ~4,700 people in the
+   zone; Black residents 1.33× as likely to be exposed; poverty rate 21.5%
+   inside vs. 15.9% nearby. Outputs: `exposure_summary.csv`,
+   `exposure_by_group.csv`. Next: scale contours to more airports, then
+   validate against a published NEM figure (Phase 2 check).
 
 ### Definition of done (Phase 1)
 

@@ -336,3 +336,126 @@ saying "modeled" on everything derived.
 | gdb "opens" but has no obvious data | It's a mosaic of subdatasets | Open `OpenFileGDB:"path":<layer>` or enumerate `ds.subdatasets` |
 | Unsure what the raster values mean | Undocumented metric | Check the distribution against physical plausibility (floors, medians, tails) |
 | Extraction grabs a whole state's noise | Radius too large / wrong state | Drive state from the airport's `iso_region`, keep radius ~40 km |
+
+---
+
+## Step 10 — Counting who lives in the noise (analyze.py), written for a first read
+
+**The question this step answers:** *how many people live inside ATL's
+65+ dB noise zone, and who are they?* This is the heart of the whole project.
+
+**Starting point and its flaw.** Our first attempt (Step 9's quick check)
+counted any tract *touching* the zone as fully inside. Result: ~85,000
+people. But look at what "touching" means: a giant rural tract with 3% of
+its land in the zone would contribute 100% of its 5,000 residents. The
+number was inflated — in the end, by about **18×**.
+
+**The fix: fractional apportionment (also called "area weighting").**
+Two ideas with plain definitions:
+
+- **Spatial join** = matching rows of two tables by their shapes ("which
+  tracts touch this zone?"). Cheap, but all-or-nothing per tract.
+- **Apportionment** = fixing that all-or-nothing: measure the *share of a
+  tract's area* inside the zone, and count the same share of its people.
+  A tract with 30% of its land in the zone contributes 30% of its
+  residents. The assumption — people spread evenly within a tract — is the
+  standard approximation at this scale, and honest to state.
+
+**Equity metrics — asking "fairly shared?"** Now that we can count exposed
+people *per group*, we compare each group's situation using:
+
+- **Reference population** = the "compared to whom" baseline. Here: everyone
+  in all tracts touching the zone (the noise zone's neighbors).
+- **Disparity ratio** = a group's *share of the exposed* divided by its
+  *share of the reference*. Read it as likelihood: 1.33 = 1.33× as likely
+  to live in the noise. 1.0 = even. Below 1 = under-represented.
+
+**ATL's first real numbers (modeled BTS contours):**
+
+- ~4,700 people live in the ≥65 dB zone — far below the naive 85k, and
+  here's why it's believable, not a bug: the zone is mostly **airport
+  property**. The two tracts with the most land inside it (73% and 55%)
+  are the airport itself, with **zero residents** (Census "9800-series"
+  tracts = special land uses like airports). Verified two ways: the
+  per-tract inside-areas sum back to exactly the zone's 22.5 km².
+- **Story emerging:** Black residents are 49.5% of the exposed but 37.3%
+  of neighbors → ratio **1.33**. Poverty rate 21.5% inside vs. 15.9%
+  nearby. Median age 32.5 inside vs. 36.3.
+
+**Essence.** *Apportionment converts geometry into honest population
+counts; a disparity claim is only as good as its reference population.*
+Two habits transfer everywhere: (1) when you split something into parts,
+**make the parts sum back to the original** (our inside-areas summed to
+the zone area exactly — that's how we knew the drop from 85k to 4.7k was
+real, not a coding error); (2) define "compared to whom" *before*
+computing any fairness number, or the number is unfalsifiable.
+
+**Troubleshooting.**
+| Symptom | Cause | Fix |
+|---|---|---|
+| Exposure count wildly lower/higher than expected | Naive whole-tract counting, or a join key problem | Apportion by area; reconcile parts against the zone's total area |
+| Ratio explodes to huge values | Tiny reference group (denominator near zero) | Report ratios only when the group's share is meaningful; show raw counts alongside |
+| Tract with 0 population inside a big zone | Airport/military/water "9800-series" tracts have no residents | Normal — check the tract's name/land use before "fixing" it |
+
+---
+
+## Glossary (running — add terms here as they appear)
+
+**Aviation & domain**
+
+- **DNL (Day-Night Average Sound Level):** the FAA's standard aircraft-noise
+  metric — a 24-hour average where nighttime operations (10pm–7am) count as
+  about 10 dB louder, since night noise disturbs sleep more. **65 dB DNL is
+  the federal "significant noise" threshold** — land above it is considered
+  incompatible with untreated residential use.
+- **DNL 65 zone / contour:** the line around an airport enclosing everywhere
+  DNL reaches 65 — the airport's "noise footprint." Our unit of analysis.
+- **NEM (Noise Exposure Map):** an airport's official, FAA-accepted noise
+  map. The gold standard; we validate our modeled numbers against published
+  NEM figures.
+- **Modeled vs published:** *published* = the airport officially produced an
+  NEM; *modeled* = the BTS national model estimated it. Every output we
+  derive says which one it came from.
+- **BTS (Bureau of Transportation Statistics):** the federal agency behind
+  the national 2022 noise mosaic.
+- **IATA code:** an airport's 3-letter code (ATL = Hartsfield-Jackson).
+- **Census tract:** the Census Bureau's small geography — neighborhoods of
+  roughly 1,200–8,000 people. The smallest area for which rich ACS data is
+  published.
+- **"9800-series" tracts:** special Census tracts for land with essentially
+  no residents — airports, big water bodies, parks. A population of 0 here
+  is normal, not missing data.
+- **GEOID:** the Census's unique ID for a tract — 11 digits (state + county
+  + tract). Our join key between the shapefiles and the demographic tables.
+- **ACS (American Community Survey):** the Census's ongoing demographic
+  survey; the "5-year" version pools five years so it's reliable for small
+  areas like tracts. Values are estimates with margins of error.
+
+**Data & GIS**
+
+- **Vector vs raster:** *vector* data = shapes (points, lines, polygons,
+  like tracts); *raster* data = a grid of cells each holding a number (like
+  the BTS noise surface). Different tools for each.
+- **Polygonize:** turning a clump of grid cells into a polygon shape.
+- **Threshold:** a cutoff — "keep cells at or above 65 dB."
+- **Spatial join:** matching rows of two tables by geometry ("which tracts
+  touch this zone?").
+- **Overlay:** laying one layer on another to compute their intersection
+  (the exact land inside the zone).
+- **Apportionment / area weighting:** counting a partial share of a tract's
+  people based on the partial share of its land inside the zone.
+- **Fractional exposure:** the people-count you get after apportioning —
+  our honest "who's in the noise" number.
+- **Reference population:** the "compared to whom" group behind any
+  fairness metric.
+- **Disparity ratio:** share of the exposed ÷ share of the reference. 1.0 =
+  even; 2.0 = twice as likely to be exposed.
+- **GeoParquet:** a fast, compact binary format for vector data. Our
+  processed-layer format.
+- **CRS (coordinate reference system):** how coordinates map to the earth.
+  **EPSG:5070** = Albers Equal Area in meters (preserves area — right for
+  population math); **EPSG:4326** = GPS-style degrees (wrong for measuring,
+  right for web maps).
+- **File Geodatabase / mosaic dataset:** Esri's container format; a mosaic
+  is its way of storing many raster tiles as one catalog. We read it with
+  open-source tools (rasterio/pyogrio) — no ArcGIS needed.
