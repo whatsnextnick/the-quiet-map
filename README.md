@@ -68,29 +68,71 @@ If `geopandas` gives you GDAL trouble on Windows:
 
 ### Step 1 — What to download, in order
 
+**Where these commands run:** in a terminal, from the project root folder —
+*not* in a Jupyter notebook. On Windows: right-click inside the project folder
+in File Explorer → **Git Bash Here** (or open Git Bash and
+`cd ~/OneDrive/Desktop/personal_projects/the-quiet-map`). In VS Code:
+**Terminal → New Terminal**. Notebooks under `notebooks/` are for exploration
+only; everything in `src/` is run from the shell as `python src/<file>.py`.
+
+**First time here? Do Step 0 below first.** If a `src/download.py` command
+fails with `ModuleNotFoundError: No module named 'requests'`, the dependencies
+were never installed — create the venv and run `pip install -r requirements.txt`
+as shown in Step 0, then try again. You only set this up once, but you must
+`source .venv/Scripts/activate` in every new terminal before running project
+commands.
+
 Everything lands in `data/raw/` and gets logged in `docs/data-sources.md`
 (source, URL, license, fetch date). Raw files are never edited.
 
-1. **Airport + runway reference — OurAirports** (mirrors FAA 5010, easiest to
-   fetch): `airports.csv` and `runways.csv` from
-   <https://ourairports.com/data/>. Filter to continental-U.S. large/medium
-   airports during prep. → `data/raw/ourairports/`
-2. **Census tract geometries — TIGER/Line**: national tract shapefile
-   (latest year) from the Census Bureau's FTP site, e.g.
-   <https://www2.census.gov/geo/tiger/TIGER2023/TRACT/>. → `data/raw/census/`
-3. **ACS 5-year demographic tables**: via the free Census API (get a key at
-   <https://api.census.gov/data/key_signup.html>) or CSV download. Tables to
-   start: `B01003` (total population), `B19013` (median household income),
-   `B01002` (median age), `B02001` (race), `B17021` (poverty). Match to the
-   same vintage as the TIGER layer. → `data/raw/acs/`
-4. **Pilot noise contours (DNL 65 dB)**: pick 3–5 airports with published
-   Noise Exposure Maps — good candidates: ATL, DFW, LAX, ORD, PHX. Sources vary
-   by airport: airport authority GIS portals, state DOT open-data sites, or
-   FAA NEM filings. Expect a mix of shapefiles and PDFs (shapefiles only are
-   usable; note PDF-only airports in the log). → `data/raw/contours/<airport>/`
-5. **Optional cross-check — EPA EJScreen**: environmental-justice indices from
-   <https://www.epa.gov/ejscreen>, useful for validating that exposed tracts
-   score high on EJ measures. → `data/raw/ejscreen/`
+Downloading is **scripted, not manual** — `python src/download.py all` fetches
+items 1–3 (set a free `CENSUS_API_KEY` first for item 3), skips files that are
+already fresh, and records every fetch in `data/raw/manifest.json`. Items 4–5
+have no reliable programmatic source and stay manual. This keeps the project
+reproducible: anyone can re-run the exact same acquisition, and refreshing to
+a new data vintage is a flag change, not an afternoon of clicks.
+
+1. **Airport + runway reference — OurAirports** *(scripted)*. Mirrors FAA
+   5010, easiest to fetch: `airports.csv` and `runways.csv`. Filter to
+   continental-U.S. large/medium airports during prep.
+   → `data/raw/ourairports/`
+2. **Census tract geometries — TIGER/Line** *(scripted)*. Per-state tract
+   shapefiles for the lower 48 + DC, one vintage
+   (`src/download.py` → `TIGER_VINTAGE`). → `data/raw/census/tracts/`
+3. **ACS 5-year demographic tables** *(scripted, needs `CENSUS_API_KEY`)*.
+   Tables: `B01003` (total population), `B19013` (median household income),
+   `B01002` (median age), `B02001` (race), `B17021` (poverty). Matched to
+   the same vintage as TIGER (`ACS_VINTAGE`). → `data/raw/acs/`
+
+   **How to run it** (in Git Bash, from the project root):
+
+   ```bash
+   # one-time setup: put your key (from
+   # https://api.census.gov/data/key_signup.html) into an environment variable
+   export CENSUS_API_KEY=put-your-key-here        # no quotes needed
+   echo $CENSUS_API_KEY                            # sanity check — must print the key
+
+   # then fetch all 49 states (fast: a few dozen small API calls)
+   python src/download.py acs
+   ```
+
+   Expect ~49 lines of `fetch acs\acs5_2022_tracts_XX.csv (NNNN tracts)` and
+   one CSV per state in `data/raw/acs/`. The `export` lasts only for that
+   terminal session — to make the key permanent, run once
+   `setx CENSUS_API_KEY "put-your-key-here"` and open a new terminal
+   (`setx` does not affect the terminal you run it in). Never paste the key
+   into a notebook or any file that could get committed — `src/download.py`
+   reads it from the environment only. PowerShell instead of Git Bash?
+   Use `$env:CENSUS_API_KEY="put-your-key-here"`.
+4. **Pilot noise contours (DNL 65 dB)** *(manual — varies per airport)*: pick
+   3–5 airports with published Noise Exposure Maps — good candidates: ATL, DFW,
+   LAX, ORD, PHX. Sources vary by airport: airport authority GIS portals, state
+   DOT open-data sites, or FAA NEM filings. Expect a mix of shapefiles and PDFs
+   (shapefiles only are usable; note PDF-only airports in the log).
+   → `data/raw/contours/<airport>/`
+5. **Optional cross-check — EPA EJScreen** *(manual)*: environmental-justice
+   indices from <https://www.epa.gov/ejscreen>, useful for validating that
+   exposed tracts score high on EJ measures. → `data/raw/ejscreen/`
 
 ### Step 2 — Log every source
 
@@ -101,12 +143,16 @@ day each file lands. If a source needs an attribution line, record it there.
 
 Implement against the stubs already in `src/`, one milestone at a time:
 
-1. `src/download.py` — one function per source from Step 1; make downloads
-   re-runnable (skip if file exists and is newer than N days).
-2. `src/prepare.py` — load raw layers, project everything to Albers Equal Area
-   (EPSG:5070), repair invalid geometries, write analysis-ready layers to
-   `data/processed/` (`tracts.geojson`, `airports.geojson`, `runways.geojson`,
-   `contours.geojson`).
+1. `src/download.py` — ✅ already implements Step 1 (sources 1–3) with
+   freshness skips and a fetch manifest. To refresh a stale file: `--force`.
+   To move to a new data vintage: bump `TIGER_VINTAGE` and `ACS_VINTAGE`
+   together (they must match) and re-run.
+2. `src/prepare.py` — ✅ built. Merges the 49 TIGER shapefiles, joins ACS
+   demographics on GEOID, filters airports/runways to continental U.S.,
+   projects everything to Albers Equal Area (EPSG:5070), repairs geometries,
+   and writes GeoParquet to `data/processed/` (`tracts.parquet`,
+   `airports.parquet`, `runways.parquet`, `contours.parquet` when contour
+   files exist). Run one stage, e.g. `python src/prepare.py tracts`, or all.
 3. First milestone to aim for: **one airport, end to end** — overlay ATL's
    contour on tracts, pull the demographics of tracts inside the DNL 65 line,
    print the number. That proves the whole pipeline before scaling.
@@ -138,7 +184,8 @@ which_airport_cost/
 ├── reports/
 │   └── figures/          # generated maps + charts
 └── docs/
-    └── data-sources.md   # source log: URL, license, date fetched
+    ├── data-sources.md   # source log: URL, license, date fetched
+    └── playbook.md       # step-by-step build log w/ transferable lessons + troubleshooting
 ```
 
 ## Roadmap
