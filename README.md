@@ -66,6 +66,12 @@ pip install -r requirements.txt
 If `geopandas` gives you GDAL trouble on Windows:
 `conda install -c conda-forge geopandas` instead.
 
+Launch the map explorer (Phase 4) whenever you want to explore results:
+
+```bash
+python -m streamlit run app/streamlit_app.py
+```
+
 ### Step 1 — What to download, in order
 
 **Where these commands run:** in a terminal, from the project root folder —
@@ -212,8 +218,12 @@ which_airport_cost/
       Native Hawaiian/Pacific Islander 1.61× as likely to be exposed; poverty
       14.1% inside vs. 11.1% nearby. Outputs: `exposure_summary.csv`,
       `exposure_by_group.csv`, `exposure_national.csv`.
-- [ ] **Phase 4 — The map.** Folium/Streamlit explorer: airport → contour →
-      exposed community.
+- [x] **Phase 4 — The map.** Folium/Streamlit explorer: airport → contour →
+      exposed community. ✅ `app/streamlit_app.py`: national overview
+      (airports sized by exposure, colored by disparity ratio) + airport
+      explorer (zone over tracts, pick the coloring variable, equity panel).
+      Run: `python -m streamlit run app/streamlit_app.py`. Static HTML
+      exports: `python src/map.py` → `reports/figures/`.
 - [ ] **Phase 5 — Story.** One-page brief + short public write-up.
 
 ## Honest constraints

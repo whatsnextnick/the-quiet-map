@@ -472,6 +472,17 @@ computing any fairness number, or the number is unfalsifiable.
   estimates. Must be masked before any math.
 - **Zero-guard:** any division's denominator can be zero at scale; return
   "no value" instead of crashing.
+- **Web map:** a basemap (pre-rendered image tiles) plus vector overlays
+  drawn on top in the browser. Our two views are both web maps.
+- **Basemap / tiles:** the map underneath the data. Free providers can
+  start requiring API keys — CartoDB did mid-project; OpenStreetMap's
+  tiles are the reliable default.
+- **Choropleth:** a map with regions colored by a variable's value (our
+  tracts colored by poverty, race share, etc.).
+- **Tooltip:** the info box that appears on hover over a map feature.
+- **Generalization (simplification):** dropping vertices from shapes for
+  display. An ~11m tolerance made our map files ~5× smaller with no
+  visible difference.
 
 ---
 
@@ -573,3 +584,56 @@ is the data pipeline's fire alarm: never paper over it, always chase it.
 cluster (LAX/LGB/SMO/BUR) has mutually overlapping zones; the national
 union counts those residents once, but per-airport numbers there overlap.
 Fine for the headline; worth a footnote in any story.
+
+---
+
+## Step 13 — The map: making the story visible (Phase 4)
+
+**What we built.** Two views, one shared core (`src/map.py` builds the
+maps; `app/streamlit_app.py` is only selection + layout; the CLI writes
+static HTML to `reports/figures/`):
+
+- **National overview** — all 646 airports as circles on a basemap: size =
+  people exposed, color = chosen group's disparity ratio, hover for
+  details. This is the "whole country at a glance" picture.
+- **Airport explorer** — pick an airport (listed by exposure rank): its
+  red DNL 65+ zone overlaid on nearby tracts, colored by a variable you
+  choose (poverty, Black share, income, age, population), runways drawn,
+  and the equity numbers + disparity bar chart beside the map.
+
+Verified: both static maps generate, and the Streamlit app boots and
+serves (health check 200). Tested by running `python -m streamlit run
+app/streamlit_app.py`.
+
+**Terms defined this step:**
+
+- **Web map** = a basemap (pre-rendered image tiles of the world) +
+  vector overlays (our shapes) drawn on top in the browser.
+- **Basemap/tiles:** the map underneath. Free ones rot — CartoDB's tiles
+  started requiring an API key mid-project (caught via a build warning);
+  we switched to OpenStreetMap's free tiles. A warning at build time is
+  signal, not noise.
+- **Choropleth:** regions colored by a variable's value — our tracts
+  colored by poverty, etc.
+- **Tooltip:** the info box on hover.
+- **Generalization (simplification):** deliberately dropping vertices
+  from shapes for display. Standard cartography — census boundaries have
+  sub-meter detail that no screen needs; an ~11m tolerance cut one map
+  from 15.4 MB to 3.3 MB with zero visible difference.
+
+**Essence.** *Display is a different job from analysis, done at the last
+moment.* Three rules: (1) **filter before you plot** — never hand a web
+map all 83,771 tracts; the spatial index gives the few hundred near an
+airport; (2) **simplify, trim, and reproject only for display** — the
+processed layers keep full precision (EPSG:5070), the map gets WGS84 and
+11m tolerance; (3) **shared core, thin UI** — map logic lives in one
+importable module, so it's testable headlessly (boot the server, curl the
+health endpoint) without pretending to click around a browser.
+
+**Troubleshooting.**
+| Symptom | Cause | Fix |
+|---|---|---|
+| HTML map file in the tens of MB | Full-precision geometry + every column embedded | Simplify (~11m), keep only tooltip/styling columns |
+| Basemap blank in browser | Tile provider now requires an API key | Switch tiles (OpenStreetMap); heed build warnings |
+| Streamlit app re-reads data every interaction | Uncached loads | `@st.cache_data` around the loader |
+| `GeoDataFrame cannot contain duplicated column names` | Keep-list included the styling variable twice | Deduplicate the column list |
