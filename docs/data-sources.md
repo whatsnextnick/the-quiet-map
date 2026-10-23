@@ -11,6 +11,7 @@ from, access terms, and the fetch date.
 | U.S. Census ACS 5-year (2022) | Tract demographics: B01003, B19013, B01002, B02001, B17021 | Free API key | 2026-10-23 |
 | Airport Noise Exposure Maps (NEM) | Published DNL 65 dB contours | Varies by airport / state | — |
 | [BTS CONUS Aviation Noise 2022](https://data.bts.gov/) | National MODELED aviation noise raster (30m, per state) — DNL surface, extracted per airport by `src/extract_contours.py` | Public | 2026-10-23 |
+| [ATL Draft NEM Update Report](https://www.atl.com/community/planningnoiseenvironmental/) | Official population (9,671) & area (13.9 sq mi) within DNL 65+, 2024 existing-year NEM — used to validate our pipeline (see docs/validation.md) | Public | 2026-10-23 |
 | [EPA EJScreen](https://www.epa.gov/ejscreen) | Environmental-justice indices (optional cross-check) | Public | — |
 
 **Notes**

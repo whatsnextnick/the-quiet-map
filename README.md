@@ -203,8 +203,9 @@ which_airport_cost/
 - [ ] **Phase 1 — Data.** Download airport/runway reference data + ACS tracts.
       Log every source in `docs/data-sources.md`. Acquire contours for a pilot
       set (start with 3–5 major airports).
-- [ ] **Phase 2 — Overlay.** Spatial join tracts × contours; sanity-check against
-      a published exposure figure for one airport.
+- [x] **Phase 2 — Overlay.** Spatial join tracts × contours; sanity-check against
+      a published exposure figure for one airport. ✅ Validated vs ATL's
+      2024 NEM: same order of magnitude (~0.5–0.6×), see docs/validation.md.
 - [ ] **Phase 3 — Equity.** Exposed population by demographic group; disparity
       index; national summary.
 - [ ] **Phase 4 — The map.** Folium/Streamlit explorer: airport → contour →

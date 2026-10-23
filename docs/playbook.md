@@ -459,3 +459,51 @@ computing any fairness number, or the number is unfalsifiable.
 - **File Geodatabase / mosaic dataset:** Esri's container format; a mosaic
   is its way of storing many raster tiles as one catalog. We read it with
   open-source tools (rasterio/pyogrio) — no ArcGIS needed.
+
+---
+
+## Step 11 — Validating our number against the airport's official one
+
+**What we did.** The last step of Phase 2: check our modeled result against
+ATL's *official* noise exposure numbers. We located the airport's
+[planning & noise page](https://www.atl.com/community/planningnoiseenvironmental/),
+downloaded the **Draft NEM Update Report** (the document behind the official
+map), and read two tables from the 2024 existing-year NEM:
+
+- **Table 8 (p.14):** total area inside the 65 dB contour = **13.9 sq mi**
+- **Table 9 (p.15):** population inside the 65 dB contour = **9,671 people**
+  (counted from parcel-level residences × Year-2020 Census)
+
+Ours: 8.7 sq mi, 4,651 people. Ratio ~0.5–0.6×. **Verdict: pass** — full
+write-up in `docs/validation.md`. New terms from this step:
+
+- **AEDT (Aviation Environmental Design Tool):** the FAA's official noise
+  model, used for airport NEMs. If BTS is "one national model," AEDT is
+  "the airport's own tailored model" — fed richer local data (exact flight
+  tracks, fleet), which is why its contours usually run larger.
+- **Sound-insulated:** homes that already received noise insulation are
+  tracked separately in NEM tables (they're "mitigated," not gone) — when
+  comparing totals, use the *sum* of insulated + not insulated.
+
+**Why a factor of 2 is a pass, not a failure.** Two independent models with
+different inputs (2022 vs 2024 operations, national vs airport-specific,
+tract vs parcel counting) agreeing within 2× means the pipeline has no
+order-of-magnitude bug — which is the only thing a sanity check can prove.
+Equality was never the standard, because even the "official" figure is a
+*model output*, not ground truth.
+
+**Essence.** *Validate magnitude and direction, not equality — and match
+definitions before comparing anything.* The traps in any validation:
+comparing numbers that measure different things (different years, different
+counting units, insulated-vs-total splits), and treating any single figure
+as truth. Also: government sites often block automated fetching
+(Cloudflare 403) — this step is deliberately a human-with-a-browser task.
+Record: source document, table, page, year, and the ratio — so the
+comparison is itself reproducible.
+
+**Troubleshooting.**
+| Symptom | Cause | Fix |
+|---|---|---|
+| Site 403s for scripts but works in your browser | Bot protection on government/enterprise sites | Make it a human step; note it in the playbook, don't fight it |
+| Several similar tables (8/9 vs 14/15) | Existing-year vs forecast-year versions | Always take the *existing* year for validation |
+| Official number way off from yours, either direction | Definition mismatch (insulated split, residence vs population, vintage) | Re-read the table's source note; document the mismatch rather than forcing agreement |
