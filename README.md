@@ -124,11 +124,15 @@ a new data vintage is a flag change, not an afternoon of clicks.
    into a notebook or any file that could get committed — `src/download.py`
    reads it from the environment only. PowerShell instead of Git Bash?
    Use `$env:CENSUS_API_KEY="put-your-key-here"`.
-4. **Pilot noise contours (DNL 65 dB)** *(manual — varies per airport)*: pick
-   3–5 airports with published Noise Exposure Maps — good candidates: ATL, DFW,
-   LAX, ORD, PHX. Sources vary by airport: airport authority GIS portals, state
-   DOT open-data sites, or FAA NEM filings. Expect a mix of shapefiles and PDFs
-   (shapefiles only are usable; note PDF-only airports in the log).
+4. **Noise contours (DNL 65 dB)** *(scripted — national layer beats
+   per-airport hunts)*: the BTS "CONUS Aviation Noise 2022" mosaic (Esri
+   File Geodatabase, 30m modeled DNL rasters, one per state) covers every
+   airport at once. `python src/extract_contours.py ATL` crops the right
+   state raster to a box around the airport, thresholds at 65 dB,
+   polygonizes, and writes `data/raw/contours/atl/`. Values are **modeled**,
+   not a published NEM — labeled as modeled everywhere. Download the gdb
+   once, set `BTS_NOISE_GDB` to its path. Airport-published NEMs, where
+   they exist, serve as Phase-2 validation sources instead.
    → `data/raw/contours/<airport>/`
 5. **Optional cross-check — EPA EJScreen** *(manual)*: environmental-justice
    indices from <https://www.epa.gov/ejscreen>, useful for validating that
@@ -177,6 +181,7 @@ which_airport_cost/
 ├── src/
 │   ├── download.py       # fetch each public dataset into data/raw/
 │   ├── prepare.py        # normalize CRS, clean geometries
+│   ├── extract_contours.py  # airport DNL contours from the BTS national mosaic
 │   ├── analyze.py        # spatial joins + equity metrics
 │   └── map.py            # interactive map generation
 ├── app/

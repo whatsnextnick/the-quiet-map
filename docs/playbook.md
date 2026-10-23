@@ -275,3 +275,64 @@ note) so a pipeline runs end-to-end before every dataset has arrived.
 | Join coverage < 100% | Key type mismatch (int vs str GEOID), vintage mismatch, leading zeros eaten | Read keys as strings (`dtype=str`), rebuild GEOID from parts, check vintages match |
 | Map distances/areas look 2× off | Mixed CRSs or degrees treated as meters | Project everything to one CRS explicitly; never assume a file's CRS |
 | `KeyError: 'geometry'` | Selecting a geometry column that lives outside the DataFrame | Pass geometry to the constructor; select attributes only |
+
+---
+
+## Step 9 — One airport's contour from a national raster mosaic
+
+**What we did.** Rather than hunting ATL's official noise map shapefile (the
+slow, uncertain route), we used the BTS "CONUS Aviation Noise 2022" download
+the user already had: a 1.2 GB Esri **File Geodatabase that is a mosaic
+dataset** — 49 state-level 30m rasters stored as BLOBs inside the .gdb
+itself (no external files), values = modeled aviation DNL where the model
+reaches ≥45 dB, nodata elsewhere. We built `src/extract_contours.py`:
+
+1. locate the airport in `airports.parquet`, read its state from `iso_region`
+2. open the state raster via a GDAL subdataset URI:
+   `OpenFileGDB:"<path>":GA_aviation_noise` (rasterio; pyogrio is
+   vector-only)
+3. windowed crop around the airport (`rasterio.windows.from_bounds`), no
+   full-raster load
+4. threshold at 65 dB, polygonize, dissolve, write GeoJSON to
+   `data/raw/contours/atl/`
+5. `src/prepare.py contours` picks it up → `contours.parquet`
+
+First overlay number, end to end: ATL's ≥65 dB zone = 22.5 km², crossing 24
+census tracts (~85k people by whole-tract intersection — the formal
+fractional-apportioned version is analyze.py's job).
+
+**Three traps, all worth remembering:**
+
+1. **"Clip to the airfield" was the wrong instruction.** A clip cuts at the
+   fence line; the project measures people *beyond* it. We *selected* ATL's
+   noise region from the national layer instead. Always ask whether the unit
+   of extraction matches the unit of analysis before clipping anything.
+2. **`rasterio.features.shapes` mask semantics silently inverted.** Passing
+   `mask=<boolean>` produced a polygon covering 5,691 km² — impossible,
+   since the window held only ~733 km² of valid cells total. Caught by
+   comparing polygonized area against pixel-count arithmetic
+   (0.031 × 815k cells × 900 m² ≈ 23 km²). Fix: build an explicit uint8
+   "include" raster and select shapes whose value == 1 — no mask kwarg.
+   *When a result can exceed what the input physically contains, the check
+   is arithmetic, not vibes.*
+3. **The file didn't document its own metric** (max value 101.9 dB looked
+   impossible for DNL). Validated empirically instead: floor of exactly
+   45.0, median 48.6, ~3% of modeled cells ≥65 — a distribution that only
+   makes sense as aviation DNL. Learn the physical plausibility range of
+   your quantity; it substitutes for missing documentation.
+
+**Essence.** *National-scale raster layers replace per-agency scavenger
+hunts.* Raster extraction is a four-move pattern — locate → crop window →
+threshold → polygonize — and it scales to every airport at once (this one
+gdb covers all 781). Esri mosaics read fine with open-source tooling, but
+expect to identify them (layer names like `_CAT`/`_CSL`, `Uri=None` meaning
+managed rasters) and to open subdatasets by URI. Keep a `source` column
+saying "modeled" on everything derived.
+
+**Troubleshooting.**
+| Symptom | Cause | Fix |
+|---|---|---|
+| Polygonized area >> valid-cell area | shapes() mask inverted | Explicit uint8 include raster; filter `value == 1` |
+| gdb "opens" but has no obvious data | It's a mosaic of subdatasets | Open `OpenFileGDB:"path":<layer>` or enumerate `ds.subdatasets` |
+| Unsure what the raster values mean | Undocumented metric | Check the distribution against physical plausibility (floors, medians, tails) |
+| Extraction grabs a whole state's noise | Radius too large / wrong state | Drive state from the airport's `iso_region`, keep radius ~40 km |

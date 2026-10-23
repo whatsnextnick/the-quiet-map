@@ -1,6 +1,7 @@
 pandas>=2.0
 geopandas>=1.0
 pyarrow>=14.0
+rasterio>=1.4
 requests>=2.31
 folium>=0.15
 streamlit>=1.30
