@@ -22,3 +22,7 @@ reports/figures/*.html
 # OS
 .DS_Store
 Thumbs.db
+
+# Story draft — not tracked yet
+story.md
+docs/story.md

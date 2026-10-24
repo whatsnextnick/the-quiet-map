@@ -637,3 +637,29 @@ health endpoint) without pretending to click around a browser.
 | Basemap blank in browser | Tile provider now requires an API key | Switch tiles (OpenStreetMap); heed build warnings |
 | Streamlit app re-reads data every interaction | Uncached loads | `@st.cache_data` around the loader |
 | `GeoDataFrame cannot contain duplicated column names` | Keep-list included the styling variable twice | Deduplicate the column list |
+
+---
+
+## Step 14 — The story (Phase 5): writing it up
+
+**What we did.** Drafted the public-facing one-pager at `docs/story.md` —
+lede, national picture, three airport vignettes (ATL validated case, NQA
+poverty gap, LGA/JFK disparity), the equity table, a "why trust this"
+section, and an honest caveats block. It stays **untracked** for now
+(gitignored) until the narrative is reviewed — a draft you can show
+people without it becoming the project's public voice prematurely.
+
+**Essence.** *A data story is an argument, and every argument needs its
+limits stated in its own voice.* The habits that transfer: (1) pick
+vignettes that each carry a *different* dimension of the finding (scale,
+poverty, race, validation) rather than three copies of the same point;
+(2) write the caveats as part of the story, not a footnote you hope
+nobody reads — for this project, "modeled, not measured" and "DNL 65 is a
+regulatory line, not a health line" *are* part of the headline; (3)
+gitignore drafts you're not ready to stand behind — version control is
+for things you want history on.
+
+**Also worth keeping:** the per-airport vs. union distinction (756k
+summed vs. 293k counted-once) will confuse every reader the way it
+confused the math — one plain sentence explaining it prevents a
+credibility question later.
