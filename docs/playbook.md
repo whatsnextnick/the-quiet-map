@@ -663,3 +663,8 @@ for things you want history on.
 summed vs. 293k counted-once) will confuse every reader the way it
 confused the math — one plain sentence explaining it prevents a
 credibility question later.
+
+**Framing lesson from review:** ratios above 1 read better as *"% more
+likely"* than *"N times as likely"* for lay audiences — 1.57× became
+"57% more likely," and sub-1 ratios become "% less likely" (0.80× = 20%
+less likely). Same math, more visceral.
