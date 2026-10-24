@@ -638,6 +638,18 @@ health endpoint) without pretending to click around a browser.
 | Streamlit app re-reads data every interaction | Uncached loads | `@st.cache_data` around the loader |
 | `GeoDataFrame cannot contain duplicated column names` | Keep-list included the styling variable twice | Deduplicate the column list |
 
+**Usability iteration (post-demo feedback):** the national map originally
+encoded disparity by *color* and exposure by bubble size — switching
+groups barely changed the picture (color differences are subtle at
+country scale). Swapped: **size now carries the selected group's disparity**
+(the dramatic, switching signal) and color carries exposure (a stable
+reference frame). Rule of thumb: *when one variable must "pop" on
+selection change, give it the strongest channel* — size beats color at
+small multiples. Also added an explicit **Apply button** (selectbox writes
+to a staging key; the button copies it into `st.session_state` that the
+map reads) so switching groups is a deliberate, single rerender instead of
+a reload on every flick.
+
 ---
 
 ## Step 14 — The story (Phase 5): writing it up

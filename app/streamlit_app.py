@@ -39,17 +39,23 @@ def show(m: folium.Map, height: int = 700) -> None:
 data = load()
 
 view = st.sidebar.radio("View", ["National overview", "Airport explorer"])
-group = st.sidebar.selectbox(
-    "Disparity group (national view)",
-    sorted(data["by_group"]["group"].unique()),
-    index=sorted(data["by_group"]["group"].unique()).index("Black / African American"))
+
+groups = sorted(data["by_group"]["group"].unique())
+group_pick = st.sidebar.selectbox(
+    "Disparity group", groups,
+    index=groups.index("Black / African American"))
+if st.sidebar.button("Apply", use_container_width=True):
+    st.session_state["active_group"] = group_pick
+group = st.session_state.get("active_group", "Black / African American")
+st.sidebar.caption(f"Showing: **{group}**")
 
 if view == "National overview":
     st.subheader("Every U.S. airport's noise footprint")
-    st.write("Circle size = people living in the airport's DNL 65+ zone. "
-             "Color = how over- or under-represented the selected group is "
-             "inside that zone (gray = not enough data). Click an airport "
-             "for details.")
+    st.write("Bubble **size** = how over-represented the selected group is in "
+             "that airport's noise zone (bigger = more over-represented). "
+             "Bubble **color** = how many people live there. Pick a group in "
+             "the sidebar and click **Apply** — watch which parts of the "
+             "country grow. Hover any airport for its numbers.")
     show(qmap.national_map(data, group))
 else:
     ranked = data["summary"].sort_values("exposed_pop", ascending=False)

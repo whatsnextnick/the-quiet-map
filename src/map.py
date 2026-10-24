@@ -36,8 +36,6 @@ VARIABLES = {
     "total_pop": ("Population", "Population", ["#fff5eb", "#fd8d3c", "#7f2704"]),
 }
 
-RATIO_COLORS = ["#2166ac", "#f7f7f7", "#b2182b"]  # under-represented -> over
-
 
 def load():
     tracts = gpd.read_parquet(DATA_DIR / "tracts.parquet")
@@ -56,6 +54,9 @@ def load():
 
 
 def national_map(data, group: str = "Black / African American") -> folium.Map:
+    """National view. Bubble SIZE encodes the chosen group's disparity
+    ratio -- this is what visibly changes when you switch groups. Bubble
+    COLOR encodes exposed population -- a constant reference frame."""
     m = folium.Map(location=[39.5, -98.35], zoom_start=4, tiles="OpenStreetMap")
     ap = data["airports"].merge(data["summary"], left_on="iata_code",
                                 right_on="airport")
@@ -65,23 +66,36 @@ def national_map(data, group: str = "Black / African American") -> folium.Map:
     pts["lat"] = pts.geometry.y
     pts["lon"] = pts.geometry.x
 
-    vmax = pts["exposed_pop"].max()
-    cmap = LinearColormap(RATIO_COLORS, vmin=0.5, vmax=2.5,
-                          caption=f"{group}: disparity ratio (1.0 = even)")
+    vmax = pts["exposed_pop"].quantile(0.98)
+    exp_cmap = LinearColormap(["#fff5f0", "#fb6a4a", "#67000d"], vmin=0,
+                              vmax=vmax, caption="People living in DNL 65+ zone")
     for _, r in pts.iterrows():
         ratio = r["disparity_ratio"]
-        color = "#999999" if pd.isna(ratio) else cmap(ratio)
+        if pd.isna(ratio):
+            radius, color = 4.5, "#999999"
+        else:
+            clipped = min(max(ratio, 0.25), 4.0)
+            radius = 2.5 + 12 * ((clipped - 0.25) / 3.75) ** 0.5
+            color = exp_cmap(min(r["exposed_pop"], vmax))
         tip = (f"{r['iata_code']} — {r['name']}<br>"
                f"{r['exposed_pop']:,.0f} people exposed<br>"
-               f"ratio: {ratio if pd.isna(ratio) else round(ratio, 2)}")
+               f"{group} ratio: "
+               f"{ratio if pd.isna(ratio) else round(ratio, 2)}")
         folium.CircleMarker(
             location=[r["lat"], r["lon"]],
-            radius=2.5 + 10 * (r["exposed_pop"] / vmax) ** 0.5,
+            radius=radius,
             color="#333333", weight=0.5,
             fill=True, fill_color=color, fill_opacity=0.75,
             tooltip=folium.Tooltip(tip),
         ).add_to(m)
-    cmap.add_to(m)
+    exp_cmap.add_to(m)
+    m.get_root().html.add_child(folium.Element(
+        '<div style="position: fixed; bottom: 32px; left: 32px; z-index: 9999; '
+        'background: rgba(255,255,255,0.92); padding: 8px 10px; '
+        'border: 1px solid #999; border-radius: 4px; font-size: 12px;">'
+        f'<b>Bubble size</b> = {group} disparity ratio<br/>'
+        '(bigger = more over-represented)<br/>'
+        '<b>Bubble color</b> = people exposed</div>'))
     return m
 
 
